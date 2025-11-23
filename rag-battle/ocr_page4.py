@@ -43,7 +43,7 @@ def ocr_image(image_bytes: bytes) -> str:
     for attempt in range(3):
         try:
             response = openai_client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model="gpt-4o",
                 temperature=0,
                 timeout=20,  # avoid freezing here
                 messages=[
@@ -88,7 +88,7 @@ def embed_text(text: str):
 # ==========================================================
 # MAIN PROCESSOR (NO SKIP)
 # ==========================================================
-def extract_images_to_chroma(pdf_path, start_page=41, end_page=60):
+def extract_images_to_chroma(pdf_path, start_page=60, end_page=60):
 
     if not os.path.exists(pdf_path):
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
@@ -162,4 +162,4 @@ def extract_images_to_chroma(pdf_path, start_page=41, end_page=60):
 # RUN
 # ==========================================================
 if __name__ == "__main__":
-    extract_images_to_chroma(PDF_PATH, start_page=52, end_page=52)
+    extract_images_to_chroma(PDF_PATH, start_page=60, end_page=60)
