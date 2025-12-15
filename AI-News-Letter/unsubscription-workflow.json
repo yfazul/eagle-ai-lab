@@ -1,0 +1,174 @@
+{
+  "name": "unsubscription-workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "unsubscribe",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1056,
+        0
+      ],
+      "id": "471b3437-2d91-4811-b17b-bedd77b5c2ea",
+      "name": "Webhook",
+      "webhookId": "f7399d4b-4f92-4078-8339-ef14a4c50840"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query;\n\nconst email = query.email || '';\nconst token = query.token || '';\n\nif (!email || !token) {\n  return [{\n    json: {\n      success: false,\n      error: 'Missing email or token',\n      email: email\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    email: decodeURIComponent(email),\n    token: token\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        0
+      ],
+      "id": "b2ddee73-6149-4fb2-8ca1-b146af00caec",
+      "name": "Validate-Deactivate"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE subscribers \nSET \n  is_active = false,\n  unsubscribed_at = NOW()\nWHERE \n  email = '{{ $json.email }}' \n  AND unsubscribe_token::text = '{{ $json.token }}'\n  AND is_active = true\nRETURNING id, email, name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -608,
+        0
+      ],
+      "id": "b8d3e2ce-2b30-4274-9d67-2ba5ab01ee67",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "eVAERzS1dehmjX12",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\n\nif (result && result.id) {\n  return [{\n    json: {\n      success: true,\n      email: result.email,\n      name: result.name || 'Subscriber'\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      email: '',\n      name: ''\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        0
+      ],
+      "id": "7ec7a732-46b3-4ce7-b3fd-c665c48e2443",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nlet htmlContent;\n\nif (data.success) {\n  htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Unsubscribed - Auto India Daily</title>\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body { \n      font-family: 'Segoe UI', Tahoma, sans-serif; \n      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);\n      min-height: 100vh;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      padding: 20px;\n    }\n    .container {\n      background: white;\n      border-radius: 20px;\n      padding: 50px 40px;\n      max-width: 450px;\n      text-align: center;\n      box-shadow: 0 20px 60px rgba(0,0,0,0.3);\n    }\n    .icon { font-size: 60px; margin-bottom: 20px; }\n    h1 { color: #1a1a2e; font-size: 24px; margin-bottom: 15px; }\n    p { color: #666; font-size: 16px; line-height: 1.6; margin-bottom: 20px; }\n    .email {\n      background: #f0f2f5;\n      padding: 10px 20px;\n      border-radius: 8px;\n      color: #333;\n      font-weight: 600;\n      display: inline-block;\n      margin-bottom: 25px;\n    }\n    .btn {\n      display: inline-block;\n      padding: 14px 30px;\n      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n      color: white;\n      text-decoration: none;\n      border-radius: 30px;\n      font-weight: 600;\n      font-size: 14px;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"icon\">👋</div>\n    <h1>You've Been Unsubscribed</h1>\n    <p>We're sad to see you go! You will no longer receive newsletters from Auto India Daily.</p>\n    <div class=\"email\">${data.email}</div>\n    <p style=\"font-size: 14px; color: #888;\">Changed your mind?</p>\n    <a href=\"https://your-lovable-app.com\" class=\"btn\">🚗 Resubscribe</a>\n  </div>\n</body>\n</html>`;\n} else {\n  htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Error - Auto India Daily</title>\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body { \n      font-family: 'Segoe UI', Tahoma, sans-serif; \n      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);\n      min-height: 100vh;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      padding: 20px;\n    }\n    .container {\n      background: white;\n      border-radius: 20px;\n      padding: 50px 40px;\n      max-width: 450px;\n      text-align: center;\n      box-shadow: 0 20px 60px rgba(0,0,0,0.3);\n    }\n    .icon { font-size: 60px; margin-bottom: 20px; }\n    h1 { color: #1a1a2e; font-size: 24px; margin-bottom: 15px; }\n    p { color: #666; font-size: 16px; line-height: 1.6; margin-bottom: 20px; }\n    .btn {\n      display: inline-block;\n      padding: 14px 30px;\n      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n      color: white;\n      text-decoration: none;\n      border-radius: 30px;\n      font-weight: 600;\n      font-size: 14px;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"icon\">⚠️</div>\n    <h1>Oops! Something Went Wrong</h1>\n    <p>This unsubscribe link is invalid or has already been used.</p>\n    <a href=\"https://your-lovable-app.com\" class=\"btn\">🏠 Go to Homepage</a>\n  </div>\n</body>\n</html>`;\n}\n\nreturn [{\n  json: {\n    htmlContent: htmlContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        0
+      ],
+      "id": "b23b934a-bd60-4df2-b116-1baee508e122",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.htmlContent }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        64,
+        0
+      ],
+      "id": "d0fd7788-6068-4fda-810c-852a46454be0",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate-Deactivate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate-Deactivate": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "aaafeff6-199f-4794-98b0-ebbec88eb75e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b08e7d97ba362d65ba2ffa0048a0fc099897a02de485ed3accce7843908addd1"
+  },
+  "id": "7PL7WjCZELCHzGGX",
+  "tags": []
+}

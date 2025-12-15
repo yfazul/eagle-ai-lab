@@ -1,0 +1,441 @@
+{
+  "name": "Subscription-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "🚗 Welcome to Auto India Daily! Confirm Your Subscription",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background: white;\">\n  \n    <!-- Header -->\n    <div style=\"background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 40px 20px; text-align: center;\">\n      <h1 style=\"color: white; margin: 0; font-size: 32px;\">🚗 Auto India Daily</h1>\n      <p style=\"color: #e94560; margin: 15px 0 0 0; font-size: 16px; letter-spacing: 2px;\">WELCOME ABOARD!</p>\n    </div>\n    \n    <!-- Main Content -->\n    <div style=\"padding: 40px 30px;\">\n      <h2 style=\"color: #1a1a2e; margin-top: 0;\">Good Morning {{ $json.name }}! 🙏</h2>\n      \n      <p style=\"color: #555; font-size: 16px; line-height: 1.6;\">\n        Thank you for subscribing to <strong>Auto Pulse Daily</strong> - your daily dose of curated car news from India!\n      </p>\n      \n      <div style=\"background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 12px; margin: 30px 0; text-align: center;\">\n        <p style=\"color: white; margin: 0 0 15px 0; font-size: 14px;\">Please confirm your email to start receiving newsletters:</p>\n        <a href=\"https://n8n.srv1169492.hstgr.cloud/webhook/verify?token={{ $json.verification_token }}&email={{ $json.email }}\" style=\"display: inline-block; background: white; color: #667eea; padding: 15px 40px; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);\">\n          ✅ Confirm My Subscription\n        </a>\n      </div>\n      \n      <h3 style=\"color: #1a1a2e;\">What to expect:</h3>\n      <ul style=\"color: #555; font-size: 14px; line-height: 2;\">\n        <li>📰 <strong>Daily newsletter</strong> at 8:00 AM IST</li>\n        <li>🚀 <strong>New car launches</strong> and updates from India</li>\n        <li>⚡ <strong>EV news</strong> and charging infrastructure updates</li>\n        <li>💰 <strong>Price changes</strong> and exclusive offers</li>\n        <li>🐦 <strong>Trending discussions</strong> from the auto community</li>\n      </ul>\n      \n      <div style=\"background: #f8f9fa; padding: 20px; border-radius: 12px; margin-top: 30px;\">\n        <p style=\"margin: 0; color: #666; font-size: 13px;\">\n          <strong>💡 Pro Tip:</strong> Add <span style=\"color: #e94560;\">newsletter@autoindiadaily.com</span> to your contacts to ensure our emails land in your inbox!\n        </p>\n      </div>\n    </div>\n    \n    <!-- Footer -->\n    <div style=\"background: #1a1a2e; padding: 30px; text-align: center;\">\n      <p style=\"color: #888; margin: 0 0 10px 0; font-size: 12px;\">Powered by AI • Made with ❤️ for Indian Car Enthusiasts</p>\n      <p style=\"color: #666; margin: 0; font-size: 11px;\">If you didn't subscribe, you can safely ignore this email.</p>\n    </div>\n    \n  </div>\n</body>\n</html>",
+        "options": {
+          "senderName": "Auto India Daily"
+        }
+      },
+      "id": "ee3e7402-5e67-485a-9ff1-795164c54d75",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1360,
+        16
+      ],
+      "webhookId": "e737954d-a135-4983-8c7a-e2be9acd461d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RsG2e5W8jAFAV3pe",
+          "name": "Fazul_Gmail"
+        }
+      },
+      "notes": "Sends immediate welcome email to new subscriber"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Subscription successful! Please check your email to confirm.\",\n  \"subscriber\": {\n    \"email\": \"{{ $('Insert Subscribers').item.json.email }}\",\n    \"name\": \"{{ $('Insert Subscribers').item.json.name }}\"\n  }\n}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "40bd6678-7b7f-40f6-8e95-03fe89ca4973",
+      "name": "Send Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1584,
+        16
+      ],
+      "notes": "Returns success response to Lovable app"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\n// Parse body if string\nlet parsedBody = body;\nif (typeof body === 'string') {\n  try {\n    parsedBody = JSON.parse(body);\n  } catch (e) {\n    throw new Error('Invalid JSON body');\n  }\n}\n\n// Validate email\nconst email = parsedBody.email || '';\nif (!email || !email.includes('@') || !email.includes('.')) {\n  throw new Error('Invalid email address');\n}\n\n// Handle preferences - stringify if object\nlet preferencesJson = '{}';\nif (parsedBody.preferences) {\n  try {\n    if (typeof parsedBody.preferences === 'string') {\n      JSON.parse(parsedBody.preferences); // Validate\n      preferencesJson = parsedBody.preferences;\n    } else {\n      preferencesJson = JSON.stringify(parsedBody.preferences);\n    }\n  } catch (e) {\n    preferencesJson = '{}';\n  }\n}\n\n// Escape single quotes for SQL\nconst escapeSql = (str) => {\n  if (!str) return '';\n  return String(str).replace(/'/g, \"''\");\n};\n\nreturn [{\n  json: {\n    email: escapeSql(email.toLowerCase().trim()),\n    name: escapeSql(parsedBody.name || ''),\n    phone: escapeSql(parsedBody.phone || ''),\n    preferences: preferencesJson\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        112
+      ],
+      "id": "5f4adddb-a698-44c1-ae12-91a74f283c1e",
+      "name": "validate and routing"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d45e7ac0-d2b3-4bd1-88ca-1afc03003555",
+              "leftValue": "={{ $json.userExists }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        688,
+        112
+      ],
+      "id": "c64a3824-9e8d-4c32-b08c-3e605e654566",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the SQL query result\nconst sqlResult = $input.all()[0].json;\n// Get original data from validate node\nconst userData = $('validate and routing').first().json;\n// Check if user exists (id will be undefined if not found)\nconst userExists = sqlResult.id !== undefined && sqlResult.id !== null;\n\nreturn [{\n  json: {\n    // User check result\n    userExists: userExists,\n    existingUserId: sqlResult.id || null,\n    isActive: sqlResult.is_active !== undefined ? sqlResult.is_active : null,\n    \n    // Pass through original user data\n    email: userData.email,\n    name: userData.name,\n    phone: userData.phone,\n    preferences: userData.preferences\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        112
+      ],
+      "id": "7447255c-5266-47fc-b158-eca23e8a13d9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"You're already subscribed to our newsletter!\",\n  \"email\": \"{{ $json.email }}\"\n}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "602c4988-7d20-4c79-89ab-7cf278ab6e41",
+      "name": "Already Subscribed Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        208
+      ],
+      "notes": "Returns error for invalid email"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, email, name, is_active, is_verified \nFROM subscribers \nWHERE email = '{{ $json.email }}'\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        112
+      ],
+      "id": "2c2daaff-66b2-4b6f-8d27-910462b67909",
+      "name": "Check If Customer Exists",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "eVAERzS1dehmjX12",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "subscribe",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        112
+      ],
+      "id": "93b83f31-65b8-4016-b47c-01aff6bfa7db",
+      "name": "Webhook",
+      "webhookId": "6f1b5820-23e7-4901-8f42-7b45527f9cfd",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CnF8t4FuhTTso9Um",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO subscribers (\n  email, \n  name, \n  phone, \n  preferences, \n  subscribed_at, \n  is_active, \n  is_verified,\n  verification_token,\n  unsubscribe_token,\n  source\n)\nVALUES (\n  '{{ $json.email }}',\n  '{{ $json.name }}',\n  '{{ $json.phone }}',\n  '{{ $json.preferences }}'::jsonb,\n  NOW(),\n  true,\n  false,\n  gen_random_uuid(),\n  gen_random_uuid(),\n  'lovable_app'\n)\nRETURNING id, email, name, verification_token, unsubscribe_token;",
+        "options": {}
+      },
+      "id": "5da69d2f-a66d-4a62-8955-dfe81fa40175",
+      "name": "Insert Subscribers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1136,
+        16
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "eVAERzS1dehmjX12",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Stores new subscriber in Supabase PostgreSQL"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "501d7960-9b30-4dfc-a761-ac7aeb61b898",
+              "leftValue": "={{ $json.userExists }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        16
+      ],
+      "id": "84e2d608-aa86-4167-98c0-8dc9e9064811",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "path": "verify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -80,
+        464
+      ],
+      "id": "b4da17c1-4ec5-489f-8415-28ca62beceaf",
+      "name": "Verify Email Webhook",
+      "webhookId": "a307c38f-c308-4188-b2e7-886ebf4ba756"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract query parameters\nconst token = $input.item.json.query.token;\nconst email = $input.item.json.query.email;\n\nreturn {\n  json: {\n    verification_token: token,\n    email: email\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        464
+      ],
+      "id": "1d077b88-91fd-4d80-9a2d-553f632e425f",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE subscribers \nSET \n  is_verified = true,\n  verified_at = NOW()\nWHERE \n  email = '{{ $json.email }}' \n  AND verification_token = '{{ $json.verification_token }}'\n  AND is_active = true\nRETURNING id, email, name, is_verified;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        464
+      ],
+      "id": "d9ab568d-d2b5-4e92-8faa-07e7ac7b8f01",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "eVAERzS1dehmjX12",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html>\n<html>\n<head>\n  <title>Email Verified</title>\n  <style>\n    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }\n    .container { background: white; color: #333; padding: 40px; border-radius: 10px; max-width: 500px; margin: 0 auto; }\n    .success { color: #10b981; font-size: 48px; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"success\">✓</div>\n    <h1>Email Verified Successfully!</h1>\n    <p>Thank you for confirming your subscription. You'll now receive:</p>\n    <ul style=\"text-align: left;\">\n      <li>📰 Daily newsletter at 8:00 AM IST</li>\n      <li>🚀 New car launches and updates from India</li>\n      <li>⚡ EV news and charging infrastructure updates</li>\n      <li>💰 Price changes and exclusive offers</li>\n    </ul>\n    <p><a href=\"https://electrify-news.lovable.app\" style=\"color: #667eea; text-decoration: none; font-weight: bold;\">Return to Home</a></p>\n  </div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        592,
+        464
+      ],
+      "id": "d3331bcd-6451-47e8-9c15-e877abbce3e9",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Send Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate and routing": {
+      "main": [
+        [
+          {
+            "node": "Check If Customer Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already Subscribed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Customer Exists": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "validate and routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Insert Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Email Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "cf25e754-314f-4e6d-9c5c-1f9e5e7f038b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b08e7d97ba362d65ba2ffa0048a0fc099897a02de485ed3accce7843908addd1"
+  },
+  "id": "lLgmkIMCTxZ61DIT",
+  "tags": []
+}

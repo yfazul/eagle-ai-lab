@@ -1,0 +1,609 @@
+{
+  "name": "NewsLetter-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/datasets/PGG1sDiPeQ98zHdab/items",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "",
+              "value": ""
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data3"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "d10a71d6-f865-4249-8baa-5872811c63eb",
+      "name": "Fetch Twitter/X Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        48
+      ],
+      "alwaysOutputData": false,
+      "notes": "Fetches trending car tweets from India"
+    },
+    {
+      "parameters": {
+        "url": "https://www.carwale.com/news/",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data2"
+            }
+          }
+        }
+      },
+      "id": "81a8ebba-c20d-4639-84cc-ff6916226438",
+      "name": "Fetch CarWale RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        240
+      ],
+      "notes": "Fetches news from CarWale (Top Indian Car Portal)"
+    },
+    {
+      "parameters": {
+        "url": "https://www.cardekho.com/india-car-news.htm",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data1"
+            }
+          }
+        }
+      },
+      "id": "170375b5-5f19-4d64-8283-71c5a04eb045",
+      "name": "Fetch CarDekho RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        432
+      ],
+      "notes": "Fetches news from CarDekho (Top Indian Car Portal)"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyze these car news articles and tweets, then create a newsletter summary:\n\n=== NEWS ARTICLES ===\n{{ JSON.stringify($json.news, null, 2) }}\n\n=== TWITTER/X POSTS ===\n{{ JSON.stringify($json.tweets, null, 2) }}\n\nProvide the summary in JSON format with these keys:\n- newsletterTitle: A catchy title for today's newsletter (string)\n- topHeadlines: Array of 3-5 objects with {title, summary, source, imageUrl, url}\n- marketBuzz: Array of 2-3 strings with market insights\n- quickBites: Array of 3-5 strings with brief news items\n- twitterHighlights: Array of 2-3 objects with {text, author, likes} - pick the most engaging tweets\n\nIMPORTANT RULES:\n1. Include the original article URL in topHeadlines\n2. marketBuzz and quickBites MUST be arrays of STRINGS only, not objects\n3. twitterHighlights MUST be an array of objects with {text, author, likes}\n4. If no tweets provided, return empty array for twitterHighlights\n5. Keep summaries concise but informative\n\nExample output format:\n{\n  \"newsletterTitle\": \"EV Revolution Hits India!\",\n  \"topHeadlines\": [\n    {\"title\": \"...\", \"summary\": \"...\", \"source\": \"CarWale\", \"imageUrl\": \"...\", \"url\": \"...\"}\n  ],\n  \"marketBuzz\": [\"Tata leads EV sales...\", \"SUV demand grows 15%...\"],\n  \"quickBites\": [\"Maruti price hike announced\", \"New Creta variant launched\"],\n  \"twitterHighlights\": [\n    {\"text\": \"Just saw the new Thar!\", \"author\": \"AutoEnthusiast\", \"likes\": 245}\n  ]\n}\n\nRespond ONLY with valid JSON, no markdown, no code blocks, no other text."
+            },
+            {
+              "content": "You are an expert automotive journalist specializing in the Indian car market. \nCreate an engaging newsletter summary for Indian car enthusiasts.\nFocus on new launches, EV updates, price changes, and industry trends.\nUse ₹ for prices. Write in a professional yet engaging tone.\nAlways include Twitter highlights when tweet data is provided.",
+              "role": "system"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 2000,
+          "temperature": 0.7
+        }
+      },
+      "id": "ce2d3b13-fde3-4318-9a6d-ce2155ead759",
+      "name": "AI Summarize News",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [
+        432,
+        144
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "INR05gSoJclzMe74",
+          "name": "n8n-demo"
+        }
+      },
+      "notes": "Uses GPT-4 to intelligently summarize and curate news"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the parsed AI response\nconst summary = $input.first().json;\n\n// If no Twitter highlights from AI, try to get from original data\nlet twitterHighlights = summary.twitterHighlights || [];\n\nif (twitterHighlights.length === 0) {\n  try {\n    const mergeData = $('Merge & Extract').first().json;\n    if (mergeData && mergeData.tweets && mergeData.tweets.length > 0) {\n      twitterHighlights = mergeData.tweets.slice(0, 3).map(tweet => ({\n        text: tweet.text || '',\n        author: tweet.author || tweet.authorName || 'Twitter User',\n        likes: tweet.likes || tweet.likeCount || 0\n      }));\n    }\n  } catch (e) {\n    // Continue without tweets\n  }\n}\n\n// High-resolution image map for fallbacks\nconst imageMap = {\n  'scorpio': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/40087/scorpio-n-exterior-right-front-three-quarter-40.jpeg',\n  'thar': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144999/thar-roxx-exterior-right-front-three-quarter.jpeg',\n  'xuv': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/42355/xuv700-exterior-right-front-three-quarter-3.jpeg',\n  'nexon': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141115/nexon-exterior-right-front-three-quarter-2.jpeg',\n  'harrier': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/140809/harrier-exterior-right-front-three-quarter-75.jpeg',\n  'safari': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/140809/safari-exterior-right-front-three-quarter-75.jpeg',\n  'punch': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/106815/punch-exterior-right-front-three-quarter-3.jpeg',\n  'curvv': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n  'creta': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141379/creta-exterior-right-front-three-quarter-5.jpeg',\n  'verna': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/150065/verna-exterior-right-front-three-quarter-3.jpeg',\n  'seltos': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141051/seltos-exterior-right-front-three-quarter-4.jpeg',\n  'sonet': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/143865/sonet-exterior-right-front-three-quarter-3.jpeg',\n  'swift': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141867/swift-exterior-right-front-three-quarter-2.jpeg',\n  'brezza': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/139137/brezza-exterior-right-front-three-quarter.jpeg',\n  'fortuner': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/166506/fortuner-exterior-right-front-three-quarter-3.jpeg',\n  'innova': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/165637/innova-hycross-exterior-right-front-three-quarter-3.jpeg',\n  'city': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/134287/city-exterior-right-front-three-quarter-77.jpeg',\n  'slavia': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/127539/slavia-exterior-right-front-three-quarter-6.jpeg',\n  'kushaq': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/148213/kushaq-exterior-right-front-three-quarter-2.jpeg',\n  'hector': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/130583/hector-exterior-right-front-three-quarter-74.jpeg',\n  'mahindra': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/42355/xuv700-exterior-right-front-three-quarter-3.jpeg',\n  'tata': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141115/nexon-exterior-right-front-three-quarter-2.jpeg',\n  'hyundai': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141379/creta-exterior-right-front-three-quarter-5.jpeg',\n  'kia': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141051/seltos-exterior-right-front-three-quarter-4.jpeg',\n  'maruti': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141867/swift-exterior-right-front-three-quarter-2.jpeg',\n  'honda': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/134287/city-exterior-right-front-three-quarter-77.jpeg',\n  'toyota': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/166506/fortuner-exterior-right-front-three-quarter-3.jpeg',\n  'skoda': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/148213/kushaq-exterior-right-front-three-quarter-2.jpeg',\n  'volkswagen': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/105687/taigun-exterior-right-front-three-quarter-3.jpeg',\n  'mg': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/130583/hector-exterior-right-front-three-quarter-74.jpeg',\n  'mercedes': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144183/c-class-exterior-right-front-three-quarter.jpeg',\n  'bmw': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/153099/3-series-exterior-right-front-three-quarter.jpeg',\n  'ev': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n  'electric': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n  'suv': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144999/thar-roxx-exterior-right-front-three-quarter.jpeg',\n  'sedan': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/134287/city-exterior-right-front-three-quarter-77.jpeg',\n  'hatchback': 'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141867/swift-exterior-right-front-three-quarter-2.jpeg'\n};\n\nconst fallbackImages = [\n  'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n  'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/144999/thar-roxx-exterior-right-front-three-quarter.jpeg',\n  'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141115/nexon-exterior-right-front-three-quarter-2.jpeg',\n  'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141379/creta-exterior-right-front-three-quarter-5.jpeg',\n  'https://imgd.aeplcdn.com/1920x1080/n/cw/ec/141051/seltos-exterior-right-front-three-quarter-4.jpeg'\n];\n\nconst categoryIcons = {\n  'launch': '🚀', 'price': '💰', 'ev': '⚡', 'electric': '⚡', 'sales': '📊',\n  'review': '⭐', 'spy': '🔍', 'facelift': '✨', 'update': '🔄', 'test': '🧪',\n  'suv': '🚙', 'sedan': '🚗', 'hatchback': '🚘', 'safety': '🛡️', 'feature': '🎯',\n  'compare': '⚖️', 'deal': '🏷️', 'offer': '🎁', 'record': '🏆', 'export': '🌍', 'production': '🏭'\n};\n\nfunction getIconForText(text) {\n  const lowerText = (text || '').toLowerCase();\n  for (const [keyword, icon] of Object.entries(categoryIcons)) {\n    if (lowerText.includes(keyword)) return icon;\n  }\n  return '📌';\n}\n\nfunction getImageForTitle(title, providedImage, index) {\n  if (providedImage && providedImage.startsWith('http') && !providedImage.includes('logo') && !providedImage.includes('icon')) {\n    return providedImage;\n  }\n  const lowerTitle = (title || '').toLowerCase();\n  for (const [keyword, imageUrl] of Object.entries(imageMap)) {\n    if (lowerTitle.includes(keyword)) return imageUrl;\n  }\n  return fallbackImages[index % fallbackImages.length];\n}\n\nfunction extractText(item) {\n  if (typeof item === 'string') return item;\n  if (typeof item === 'object' && item !== null) {\n    return item.text || item.title || item.content || item.description || item.headline || item.insight || '';\n  }\n  return String(item || '');\n}\n\nfunction extractUrl(item) {\n  if (typeof item === 'object' && item !== null) {\n    return item.url || item.link || item.href || '';\n  }\n  return '';\n}\n\nconst today = new Date();\nconst dateStr = today.toLocaleDateString('en-IN', { \n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' \n});\n\n// Generate Headlines HTML\nconst headlinesHtml = (summary.topHeadlines || []).map((item, idx) => {\n  const imageUrl = getImageForTitle(item.title, item.imageUrl, idx);\n  const articleUrl = item.url || item.link || '#';\n  const icon = getIconForText(item.title);\n  \n  return `\n  <div style=\"margin-bottom: 24px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.12);\">\n    <a href=\"${articleUrl}\" target=\"_blank\" style=\"text-decoration: none; display: block;\">\n      <div style=\"position: relative;\">\n        <img src=\"${imageUrl}\" alt=\"${item.title}\" style=\"width: 100%; height: 200px; object-fit: cover; display: block;\">\n        <div style=\"position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px;\">\n          ${icon} ${item.source || 'Auto News'}\n        </div>\n      </div>\n      <div style=\"padding: 18px; background: ${idx === 0 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#ffffff'}; ${idx === 0 ? 'color: white;' : 'color: #333;'}\">\n        <h3 style=\"margin: 0 0 10px 0; font-size: ${idx === 0 ? '19px' : '17px'}; line-height: 1.4; font-weight: 600;\">${item.title}</h3>\n        <p style=\"margin: 0 0 12px 0; opacity: 0.85; font-size: 14px; line-height: 1.6;\">${item.summary || ''}</p>\n        <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n          <span style=\"font-size: 12px; opacity: 0.7;\">📰 ${item.source || 'Auto News'}</span>\n          <span style=\"font-size: 12px; ${idx === 0 ? 'color: #fff;' : 'color: #667eea;'} font-weight: 500;\">Read More →</span>\n        </div>\n      </div>\n    </a>\n  </div>`;\n}).join('');\n\n// Generate Market Buzz HTML\nconst marketBuzzHtml = (summary.marketBuzz || []).map((item, idx) => {\n  const text = extractText(item);\n  const icon = getIconForText(text);\n  const url = extractUrl(item);\n  const gradients = [\n    'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)',\n    'linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%)',\n    'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',\n    'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)'\n  ];\n  const borderColors = ['#667eea', '#00bcd4', '#ff9800', '#9c27b0'];\n  \n  return `\n  <div style=\"background: ${gradients[idx % gradients.length]}; padding: 16px; border-radius: 12px; margin-bottom: 12px; border-left: 4px solid ${borderColors[idx % borderColors.length]}; box-shadow: 0 2px 8px rgba(0,0,0,0.06);\">\n    <div style=\"display: flex; align-items: flex-start; gap: 12px;\">\n      <span style=\"font-size: 24px; line-height: 1;\">${icon}</span>\n      <div style=\"flex: 1;\">\n        <p style=\"margin: 0; font-size: 14px; line-height: 1.6; color: #333; font-weight: 500;\">${text}</p>\n        ${url ? `<a href=\"${url}\" target=\"_blank\" style=\"display: inline-block; margin-top: 8px; font-size: 12px; color: ${borderColors[idx % borderColors.length]}; text-decoration: none; font-weight: 600;\">Learn More →</a>` : ''}\n      </div>\n    </div>\n  </div>`;\n}).join('');\n\n// Generate Quick Bites HTML\nconst quickBitesHtml = (summary.quickBites || []).map((item, idx) => {\n  const text = extractText(item);\n  const icon = getIconForText(text);\n  const url = extractUrl(item);\n  const bulletColors = ['#667eea', '#e94560', '#00bcd4', '#ff9800', '#4caf50'];\n  \n  return url \n    ? `<li style=\"margin-bottom: 14px; font-size: 14px; line-height: 1.6; list-style: none; padding-left: 0;\">\n        <a href=\"${url}\" target=\"_blank\" style=\"text-decoration: none; color: inherit; display: flex; align-items: flex-start; gap: 10px;\">\n          <span style=\"display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: ${bulletColors[idx % bulletColors.length]}; color: white; border-radius: 50%; font-size: 14px; flex-shrink: 0;\">${icon}</span>\n          <span style=\"flex: 1; color: #333;\">${text}<span style=\"color: ${bulletColors[idx % bulletColors.length]}; font-weight: 500; margin-left: 4px;\">→</span></span>\n        </a>\n      </li>`\n    : `<li style=\"margin-bottom: 14px; font-size: 14px; line-height: 1.6; list-style: none; padding-left: 0;\">\n        <div style=\"display: flex; align-items: flex-start; gap: 10px;\">\n          <span style=\"display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: ${bulletColors[idx % bulletColors.length]}; color: white; border-radius: 50%; font-size: 14px; flex-shrink: 0;\">${icon}</span>\n          <span style=\"flex: 1; color: #333;\">${text}</span>\n        </div>\n      </li>`;\n}).join('');\n\n// Generate Twitter Highlights HTML\nconst twitterHighlightsHtml = (twitterHighlights || []).map((tweet, idx) => {\n  const text = typeof tweet === 'string' ? tweet : (tweet.text || '');\n  const author = tweet.author || tweet.authorName || 'Twitter User';\n  const likes = tweet.likes || tweet.likeCount || 0;\n  \n  return `\n  <div style=\"background: white; padding: 16px; border-radius: 12px; margin-bottom: 12px; border-left: 4px solid #1DA1F2; box-shadow: 0 2px 8px rgba(0,0,0,0.06);\">\n    <div style=\"display: flex; align-items: flex-start; gap: 12px;\">\n      <span style=\"font-size: 24px;\">🐦</span>\n      <div style=\"flex: 1;\">\n        <p style=\"margin: 0 0 8px 0; font-size: 14px; line-height: 1.6; color: #333;\">\"${text}\"</p>\n        <div style=\"display: flex; justify-content: space-between; align-items: center;\">\n          <span style=\"font-size: 12px; color: #1DA1F2; font-weight: 600;\">@${author}</span>\n          <span style=\"font-size: 12px; color: #666;\">❤️ ${likes}</span>\n        </div>\n      </div>\n    </div>\n  </div>`;\n}).join('');\n\nconst heroImage = getImageForTitle(\n  summary.topHeadlines?.[0]?.title || '', \n  summary.topHeadlines?.[0]?.imageUrl, \n  0\n);\nconst heroUrl = summary.topHeadlines?.[0]?.url || summary.topHeadlines?.[0]?.link || '#';\n\n// Full HTML Template\nconst htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>${summary.newsletterTitle || 'Auto India Daily'}</title>\n</head>\n<body style=\"margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5;\">\n  <div style=\"max-width: 600px; margin: 0 auto; background: white; box-shadow: 0 0 40px rgba(0,0,0,0.1);\">\n    \n    <!-- Header -->\n    <div style=\"background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 35px 20px; text-align: center;\">\n      <h1 style=\"color: white; margin: 0; font-size: 32px; font-weight: 700;\">🚗 Auto India Daily</h1>\n      <p style=\"color: #e94560; margin: 12px 0 0 0; font-size: 13px; letter-spacing: 3px; text-transform: uppercase;\">Your Daily Dose of Car News</p>\n    </div>\n    \n    <!-- Hero Image -->\n    <a href=\"${heroUrl}\" target=\"_blank\" style=\"text-decoration: none; display: block;\">\n      <div style=\"position: relative;\">\n        <img src=\"${heroImage}\" alt=\"Featured Car\" style=\"width: 100%; height: 240px; object-fit: cover; display: block;\">\n        <div style=\"position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); padding: 30px 20px 20px 20px;\">\n          <span style=\"background: #e94560; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase;\">Featured</span>\n          <h2 style=\"color: white; margin: 12px 0 0 0; font-size: 20px; line-height: 1.3; font-weight: 600;\">${summary.newsletterTitle || 'Top Stories from Indian Auto World'}</h2>\n          <p style=\"color: #ccc; margin: 8px 0 0 0; font-size: 12px;\">📅 ${dateStr}</p>\n        </div>\n      </div>\n    </a>\n    \n    <!-- Main Content -->\n    <div style=\"padding: 30px 25px;\">\n      \n      <!-- Top Headlines -->\n      <div style=\"margin-bottom: 35px;\">\n        <div style=\"display: flex; align-items: center; margin-bottom: 20px;\">\n          <div style=\"width: 4px; height: 28px; background: linear-gradient(to bottom, #e94560, #667eea); border-radius: 2px; margin-right: 12px;\"></div>\n          <h2 style=\"color: #1a1a2e; font-size: 20px; margin: 0; font-weight: 700;\">🔥 Top Headlines</h2>\n        </div>\n        ${headlinesHtml}\n      </div>\n      \n      <!-- Market Buzz -->\n      <div style=\"margin-bottom: 35px;\">\n        <div style=\"display: flex; align-items: center; margin-bottom: 20px;\">\n          <div style=\"width: 4px; height: 28px; background: linear-gradient(to bottom, #ff9800, #ffc107); border-radius: 2px; margin-right: 12px;\"></div>\n          <h2 style=\"color: #1a1a2e; font-size: 20px; margin: 0; font-weight: 700;\">📈 Market Buzz</h2>\n        </div>\n        <div style=\"background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); padding: 20px; border-radius: 16px;\">\n          ${marketBuzzHtml}\n        </div>\n      </div>\n      \n      <!-- Quick Bites -->\n      <div style=\"margin-bottom: 35px;\">\n        <div style=\"display: flex; align-items: center; margin-bottom: 20px;\">\n          <div style=\"width: 4px; height: 28px; background: linear-gradient(to bottom, #00bcd4, #4caf50); border-radius: 2px; margin-right: 12px;\"></div>\n          <h2 style=\"color: #1a1a2e; font-size: 20px; margin: 0; font-weight: 700;\">⚡ Quick Bites</h2>\n        </div>\n        <div style=\"background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); padding: 20px; border-radius: 16px;\">\n          <ul style=\"padding: 0; margin: 0; list-style: none;\">\n            ${quickBitesHtml}\n          </ul>\n        </div>\n      </div>\n      \n      <!-- Twitter Highlights -->\n      ${twitterHighlights && twitterHighlights.length > 0 ? `\n      <div style=\"margin-bottom: 35px;\">\n        <div style=\"display: flex; align-items: center; margin-bottom: 20px;\">\n          <div style=\"width: 4px; height: 28px; background: linear-gradient(to bottom, #1DA1F2, #0d8ecf); border-radius: 2px; margin-right: 12px;\"></div>\n          <h2 style=\"color: #1a1a2e; font-size: 20px; margin: 0; font-weight: 700;\">🐦 Twitter Buzz</h2>\n        </div>\n        <div style=\"background: linear-gradient(135deg, #e8f5fd 0%, #d1eefa 100%); padding: 20px; border-radius: 16px;\">\n          ${twitterHighlightsHtml}\n        </div>\n      </div>\n      ` : ''}\n      \n      <!-- Social Links -->\n      <div style=\"text-align: center; padding: 20px 0; border-top: 1px solid #e5e7eb;\">\n        <p style=\"color: #666; font-size: 13px; margin: 0 0 12px 0;\">Follow us for more updates</p>\n        <div>\n          <a href=\"#\" style=\"display: inline-block; margin: 0 8px; padding: 8px 16px; background: #1DA1F2; color: white; text-decoration: none; border-radius: 20px; font-size: 12px; font-weight: 500;\">🐦 Twitter</a>\n          <a href=\"#\" style=\"display: inline-block; margin: 0 8px; padding: 8px 16px; background: #E4405F; color: white; text-decoration: none; border-radius: 20px; font-size: 12px; font-weight: 500;\">📸 Instagram</a>\n        </div>\n      </div>\n      \n    </div>\n    \n    <!-- Footer -->\n    <div style=\"background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px 25px; text-align: center;\">\n      <p style=\"color: #9ca3af; margin: 0 0 8px 0; font-size: 13px;\">Powered by AI • Curated for Indian Car Enthusiasts</p>\n      <p style=\"color: #6b7280; margin: 0; font-size: 11px;\">© ${today.getFullYear()} Auto India Daily. All rights reserved.</p>\n      <div style=\"margin-top: 15px;\">\n        <a href=\"#\" style=\"color: #e94560; font-size: 11px; text-decoration: none; margin: 0 10px;\">Unsubscribe</a>\n        <span style=\"color: #4b5563;\">|</span>\n        <a href=\"#\" style=\"color: #e94560; font-size: 11px; text-decoration: none; margin: 0 10px;\">Preferences</a>\n      </div>\n    </div>\n    \n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    htmlContent: htmlContent,\n    subject: `🚗 ${summary.newsletterTitle || 'Auto India Daily'} - ${dateStr}`,\n    newsletterTitle: summary.newsletterTitle || 'Auto India Daily',\n    generatedAt: new Date().toISOString()\n  }\n}];\n\n// Get subscriber data from previous node\nconst subscriber = $('Fetch Active Subscribers').first().json;\nconst newsletterHtml = $('Generate HTML Newsletter').first().json.htmlContent;\n\n// Generate unsubscribe URL\nconst unsubscribeUrl = `https://your-n8n-domain.com/webhook/unsubscribe?email=${encodeURIComponent(subscriber.email)}&token=${subscriber.unsubscribe_token}`;\n\n// Replace placeholder in HTML\nconst finalHtml = newsletterHtml.replace(\n  /href=\"#\"([^>]*>Unsubscribe)/g, \n  `href=\"${unsubscribeUrl}\"$1`\n);\n\nreturn [{\n  json: {\n    to: subscriber.email,\n    name: subscriber.name,\n    subject: $('Generate HTML Newsletter').first().json.subject,\n    htmlContent: finalHtml\n  }\n}];"
+      },
+      "id": "64635c97-df27-4a59-a536-5edd770953a8",
+      "name": "Generate HTML Newsletter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        144
+      ],
+      "notes": "Generates beautiful HTML email template"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, email, name, unsubscribe_token\nFROM subscribers \nWHERE is_active = true;",
+        "options": {}
+      },
+      "id": "74270b97-288c-4d25-8a24-d742612023af",
+      "name": "Fetch Active Subscribers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1232,
+        144
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "eVAERzS1dehmjX12",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Fetches all active subscribers from Supabase"
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "1d5e4208-1a7a-4dd0-ba80-95d49c51cfae",
+      "name": "Split Into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1456,
+        48
+      ],
+      "notes": "Process subscribers in batches to avoid rate limits"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.htmlContent }}",
+        "options": {
+          "senderName": "Auto Pulse India"
+        }
+      },
+      "id": "5373fd9b-c329-43cf-8816-09ab65e20672",
+      "name": "Send via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1904,
+        48
+      ],
+      "webhookId": "80b14939-adbb-4281-bbdf-22fcc69a2342",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RsG2e5W8jAFAV3pe",
+          "name": "Fazul_Gmail"
+        }
+      },
+      "notes": "Sends newsletter email to each subscriber"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "=support-aws",
+          "mode": "name"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocks }}",
+        "text": "={{ $json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "95d14466-dbcb-461c-80e3-4a8b964ebf28",
+      "name": "Post to Slack Channel",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        384
+      ],
+      "webhookId": "92b637d0-9333-4342-aa36-51f4c2e6d8ea",
+      "alwaysOutputData": false,
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "neX68C3V4wnAsdQF",
+          "name": "Slack account"
+        }
+      },
+      "notes": "Posts newsletter summary to Slack channel"
+    },
+    {
+      "parameters": {},
+      "id": "0f83b01a-1720-4980-84fa-ace14a27a54c",
+      "name": "Newsletter Sent",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        96
+      ],
+      "notes": "Newsletter delivery complete"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE subscribers SET last_email_sent = NOW(), emails_received = emails_received + 1 WHERE email = '{{ $json.email }}'",
+        "options": {}
+      },
+      "id": "2a4425fa-4c3a-4dca-8c88-faf3a10b5cdf",
+      "name": "Update Subscriber Stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2128,
+        48
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "eVAERzS1dehmjX12",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Updates email delivery stats"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -16,
+        112
+      ],
+      "id": "c1dfa590-52b6-4e20-9ad1-954d0c3395fd",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items from Append merge\nconst items = $input.all();\n\n// Function to generate Google Images search URL (as fallback reference)\nfunction getGoogleImageSearchUrl(title) {\n  const query = encodeURIComponent(title + ' car India');\n  return `https://www.google.com/search?q=${query}&tbm=isch`;\n}\n\n// Function to generate a placeholder image with text\nfunction getPlaceholderImage(title, index) {\n  // Use different stock car images based on keywords in title\n  const imageMap = {\n    'tata': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n    'mahindra': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144999/thar-roxx-exterior-right-front-three-quarter.jpeg',\n    'maruti': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141867/swift-exterior-right-front-three-quarter-2.jpeg',\n    'hyundai': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141115/nexon-exterior-right-front-three-quarter-2.jpeg',\n    'kia': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141051/seltos-exterior-right-front-three-quarter-4.jpeg',\n    'honda': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/134287/city-exterior-right-front-three-quarter-77.jpeg',\n    'toyota': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/166506/fortuner-exterior-right-front-three-quarter-3.jpeg',\n    'skoda': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/148213/kushaq-exterior-right-front-three-quarter-2.jpeg',\n    'volkswagen': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144681/taigun-exterior-right-front-three-quarter.jpeg',\n    'mg': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/130583/hector-exterior-right-front-three-quarter-74.jpeg',\n    'ev': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n    'electric': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n    'suv': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144999/thar-roxx-exterior-right-front-three-quarter.jpeg',\n    'sedan': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/134287/city-exterior-right-front-three-quarter-77.jpeg',\n    'hatchback': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141867/swift-exterior-right-front-three-quarter-2.jpeg',\n    'scorpio': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/40087/scorpio-n-exterior-right-front-three-quarter-40.jpeg',\n    'fortuner': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/166506/fortuner-exterior-right-front-three-quarter-3.jpeg',\n    'innova': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/165637/innova-hycross-exterior-right-front-three-quarter-3.jpeg',\n    'creta': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141379/creta-exterior-right-front-three-quarter-5.jpeg',\n    'seltos': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141051/seltos-exterior-right-front-three-quarter-4.jpeg',\n    'nexon': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141115/nexon-exterior-right-front-three-quarter-2.jpeg',\n    'harrier': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/140809/harrier-exterior-right-front-three-quarter-75.jpeg',\n    'safari': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/140809/safari-exterior-right-front-three-quarter-75.jpeg',\n    'punch': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/106815/punch-exterior-right-front-three-quarter-3.jpeg',\n    'thar': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144999/thar-roxx-exterior-right-front-three-quarter.jpeg',\n    'xuv': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/42355/xuv700-exterior-right-front-three-quarter-3.jpeg',\n    'brezza': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/139137/brezza-exterior-right-front-three-quarter.jpeg',\n    'swift': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141867/swift-exterior-right-front-three-quarter-2.jpeg',\n    'baleno': 'https://imgd.aeplcdn.com/1056x594/n/cw/ec/135591/baleno-exterior-right-front-three-quarter-2.jpeg'\n  };\n  \n  // Default fallback images\n  const defaultImages = [\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144681/curvv-ev-exterior-right-front-three-quarter.jpeg',\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/139651/curvv-exterior-right-front-three-quarter.jpeg',\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/144999/thar-roxx-exterior-right-front-three-quarter.jpeg',\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141115/nexon-exterior-right-front-three-quarter-2.jpeg',\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/140809/harrier-exterior-right-front-three-quarter-75.jpeg',\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141051/seltos-exterior-right-front-three-quarter-4.jpeg',\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/141379/creta-exterior-right-front-three-quarter-5.jpeg',\n    'https://imgd.aeplcdn.com/1056x594/n/cw/ec/134287/city-exterior-right-front-three-quarter-77.jpeg'\n  ];\n  \n  const lowerTitle = title.toLowerCase();\n  \n  // Find matching image based on keywords\n  for (const [keyword, imageUrl] of Object.entries(imageMap)) {\n    if (lowerTitle.includes(keyword)) {\n      return imageUrl;\n    }\n  }\n  \n  // Return a unique default image based on index\n  return defaultImages[index % defaultImages.length];\n}\n\nlet allNews = [];\nlet allTweets = [];\nlet newsIndex = 0;\n\n// Parse CarWale news from HTML\nfunction parseCarWaleNews(html) {\n  const news = [];\n  \n  // Extract images more specifically - look for article card images\n  const imageMatches = [];\n  const imgRegex = /<img[^>]*src=\"(https:\\/\\/imgd\\.aeplcdn\\.com\\/[^\"]+)\"[^>]*>/gi;\n  let imgMatch;\n  while ((imgMatch = imgRegex.exec(html)) !== null) {\n    const src = imgMatch[1];\n    if (src.includes('/n/cw/ec/') || src.includes('/news/')) {\n      imageMatches.push(src);\n    }\n  }\n  \n  const titleRegex = /<a[^>]*href=\"(\\/news\\/[^\"]*)\"[^>]*>([^<]{25,})<\\/a>/gi;\n  let match;\n  let imgIndex = 0;\n  \n  while ((match = titleRegex.exec(html)) !== null && news.length < 5) {\n    const title = match[2].trim().replace(/\\s+/g, ' ');\n    \n    if (!title.toLowerCase().includes('see all') && \n        !title.toLowerCase().includes('read more') &&\n        !title.toLowerCase().includes('view all')) {\n      \n      // Use unique image or smart fallback\n      const imageUrl = imageMatches[imgIndex] || getPlaceholderImage(title, newsIndex);\n      imgIndex++;\n      newsIndex++;\n      \n      news.push({\n        title: title,\n        url: `https://www.carwale.com${match[1]}`,\n        imageUrl: imageUrl,\n        source: 'CarWale'\n      });\n    }\n  }\n  \n  return news;\n}\n\n// Parse CarDekho news from HTML\nfunction parseCarDekhoNews(html) {\n  const news = [];\n  \n  // Extract images\n  const imageMatches = [];\n  const imgRegex = /<img[^>]*src=\"(https:\\/\\/stimg\\.cardekho\\.com\\/[^\"]+)\"[^>]*>/gi;\n  let imgMatch;\n  while ((imgMatch = imgRegex.exec(html)) !== null) {\n    imageMatches.push(imgMatch[1]);\n  }\n  \n  const titleRegex = /title=\"([^\"]{25,})\"[^>]*href=\"(\\/india-car-news\\/[^\"]*)\"/gi;\n  let match;\n  let imgIndex = 0;\n  \n  while ((match = titleRegex.exec(html)) !== null && news.length < 5) {\n    const title = match[1].trim();\n    \n    const imageUrl = imageMatches[imgIndex] || getPlaceholderImage(title, newsIndex);\n    imgIndex++;\n    newsIndex++;\n    \n    news.push({\n      title: title,\n      url: `https://www.cardekho.com${match[2]}`,\n      imageUrl: imageUrl,\n      source: 'CarDekho'\n    });\n  }\n  \n  return news;\n}\n\n// Parse Google News from SerpAPI JSON\nfunction parseGoogleNews(data) {\n  const news = [];\n  \n  let newsData = data;\n  if (typeof data === 'string') {\n    try {\n      newsData = JSON.parse(data);\n    } catch (e) {\n      return news;\n    }\n  }\n  \n  const newsArray = newsData.news || newsData.news_results || [];\n  \n  newsArray.slice(0, 5).forEach((article) => {\n    const title = article.title || '';\n    const imageUrl = article.imageUrl || article.thumbnail || getPlaceholderImage(title, newsIndex);\n    newsIndex++;\n    \n    news.push({\n      title: title,\n      description: article.description || article.snippet || '',\n      url: article.url || article.link || '',\n      imageUrl: imageUrl,\n      source: article.source?.name || article.source || 'Google News',\n      publishedAt: article.publishedAt || article.date || ''\n    });\n  });\n  \n  return news;\n}\n\n// Parse Twitter/X posts\nfunction parseTwitterPosts(data) {\n  const tweets = [];\n  \n  let tweetData = data;\n  if (typeof data === 'string') {\n    try {\n      tweetData = JSON.parse(data);\n    } catch (e) {\n      return tweets;\n    }\n  }\n  \n  const tweetArray = Array.isArray(tweetData) ? tweetData : [tweetData];\n  \n  tweetArray.slice(0, 10).forEach(tweet => {\n    if (tweet.text || tweet.fullText || tweet.full_text) {\n      tweets.push({\n        text: tweet.text || tweet.fullText || tweet.full_text || '',\n        author: tweet.author?.userName || tweet.user?.screen_name || 'Unknown',\n        authorName: tweet.author?.name || tweet.user?.name || 'Unknown',\n        likes: tweet.likeCount || tweet.favorite_count || 0,\n        retweets: tweet.retweetCount || tweet.retweet_count || 0,\n        url: tweet.url || tweet.twitterUrl || ''\n      });\n    }\n  });\n  \n  return tweets;\n}\n\n// Process all items from merge\nitems.forEach(item => {\n  const data = item.json;\n  \n  Object.keys(data).forEach(key => {\n    const value = data[key];\n    \n    if (!value) return;\n    \n    // CarWale\n    if (typeof value === 'string' && (key === 'data1' || value.includes('carwale.com') || value.includes('CarWale'))) {\n      const carwaleNews = parseCarWaleNews(value);\n      allNews = [...allNews, ...carwaleNews];\n    }\n    // CarDekho\n    else if (typeof value === 'string' && (key === 'data2' || value.includes('cardekho.com') || value.includes('CarDekho'))) {\n      const cardekhoNews = parseCarDekhoNews(value);\n      allNews = [...allNews, ...cardekhoNews];\n    }\n    // Twitter\n    else if (key === 'data3' || (typeof value === 'string' && value.includes('\"type\":\"tweet\"'))) {\n      const tweets = parseTwitterPosts(value);\n      allTweets = [...allTweets, ...tweets];\n    }\n    // Google News\n    else if (key === 'data4' || (typeof value === 'string' && value.includes('\"source\":\"google_news\"'))) {\n      const googleNews = parseGoogleNews(value);\n      allNews = [...allNews, ...googleNews];\n    }\n  });\n  \n  // Direct SerpAPI response\n  if (data.news_results && Array.isArray(data.news_results)) {\n    data.news_results.slice(0, 5).forEach((article) => {\n      const title = article.title || '';\n      allNews.push({\n        title: title,\n        description: article.snippet || '',\n        url: article.link || '',\n        imageUrl: article.thumbnail || getPlaceholderImage(title, newsIndex),\n        source: article.source?.name || 'Google News',\n        publishedAt: article.date || ''\n      });\n      newsIndex++;\n    });\n  }\n  \n  // Direct Twitter data\n  if (data.text || data.fullText || data.full_text) {\n    allTweets.push({\n      text: data.text || data.fullText || data.full_text || '',\n      author: data.author?.userName || data.user?.screen_name || 'Unknown',\n      authorName: data.author?.name || data.user?.name || 'Unknown',\n      likes: data.likeCount || data.favorite_count || 0,\n      retweets: data.retweetCount || data.retweet_count || 0,\n      url: data.url || data.twitterUrl || ''\n    });\n  }\n});\n\n// Remove duplicates\nconst uniqueNews = allNews.filter((item, index, self) =>\n  index === self.findIndex(t => t.title.toLowerCase() === item.title.toLowerCase())\n);\n\nconst uniqueTweets = allTweets.filter((item, index, self) =>\n  index === self.findIndex(t => t.text === item.text)\n);\n\nreturn [{\n  json: {\n    news: uniqueNews.slice(0, 15),\n    tweets: uniqueTweets.slice(0, 10),\n    totalNews: uniqueNews.length,\n    totalTweets: uniqueTweets.length,\n    sources: ['CarWale', 'CarDekho', 'Google News', 'Twitter/X'],\n    collectedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        144
+      ],
+      "id": "188f4e17-ade9-44d0-871a-53b92ecd7903",
+      "name": "Merge & Extract"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get AI response\nconst aiResponse = $input.first().json;\n\n// Extract the content from the AI response\nlet content = aiResponse.message?.content || aiResponse.content || '';\n\n// Remove markdown code blocks if present\ncontent = content.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n\n// Parse the JSON\nlet summary;\ntry {\n  summary = JSON.parse(content);\n} catch (e) {\n  // If parsing fails, create a default structure\n  summary = {\n    newsletterTitle: \"Auto India Daily - Today's Top Stories\",\n    topHeadlines: [],\n    marketBuzz: [],\n    quickBites: [],\n    twitterHighlights: []\n  };\n}\n\n// Ensure twitterHighlights exists and is an array\nif (!summary.twitterHighlights || !Array.isArray(summary.twitterHighlights)) {\n  summary.twitterHighlights = [];\n}\n\n// Ensure marketBuzz items are strings\nif (summary.marketBuzz && Array.isArray(summary.marketBuzz)) {\n  summary.marketBuzz = summary.marketBuzz.map(item => {\n    if (typeof item === 'string') return item;\n    if (typeof item === 'object') return item.text || item.content || item.description || JSON.stringify(item);\n    return String(item);\n  });\n}\n\n// Ensure quickBites items are strings\nif (summary.quickBites && Array.isArray(summary.quickBites)) {\n  summary.quickBites = summary.quickBites.map(item => {\n    if (typeof item === 'string') return item;\n    if (typeof item === 'object') return item.text || item.content || item.description || JSON.stringify(item);\n    return String(item);\n  });\n}\n\nreturn [{\n  json: {\n    newsletterTitle: summary.newsletterTitle || 'Auto India Daily',\n    topHeadlines: summary.topHeadlines || [],\n    marketBuzz: summary.marketBuzz || [],\n    quickBites: summary.quickBites || [],\n    twitterHighlights: summary.twitterHighlights || [],\n    generatedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        144
+      ],
+      "id": "1c1f8308-0bab-4bcb-872e-32e81a9efb1c",
+      "name": "Format AI Response"
+    },
+    {
+      "parameters": {
+        "operation": "google_news",
+        "q": "India car launch OR new car India OR EV India",
+        "additionalFields": {
+          "output": "json"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-serpapi.serpApi",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -144
+      ],
+      "id": "ba5fe503-206d-4571-9f90-3589195f50b0",
+      "name": "Google_news search",
+      "credentials": {
+        "serpApi": {
+          "id": "Gd0drcTiTVQAYxDs",
+          "name": "SerpAPI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst newsResults = data.news_results || [];\n\nconst news = newsResults.slice(0, 10).map(article => ({\n  title: article.title || '',\n  description: article.snippet || '',\n  url: article.link || '',\n  source: article.source?.name || 'Google News',\n  imageUrl: article.thumbnail || '',\n  publishedAt: article.date || '',\n  type: 'news'\n}));\n\nreturn [{\n  json: {\n    data4: JSON.stringify({\n      source: 'google_news',\n      news: news\n    })\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        -144
+      ],
+      "id": "8c0dc694-44bd-4e82-b3ac-efd9578d5daf",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all subscribers from the input\nconst subscribers = $input.all();\n\n// Get newsletter HTML from previous node\nconst newsletterData = $('Generate HTML Newsletter').first().json;\n\n// Process each subscriber and create email data\nconst emailData = subscribers.map(item => {\n  const subscriber = item.json;\n  \n  // Generate unsubscribe URL with token for this subscriber\n  const unsubscribeUrl = `https://n8n.srv1169492.hstgr.cloud/webhook/unsubscribe?email=${encodeURIComponent(subscriber.email)}&token=${subscriber.unsubscribe_token}`;\n  \n  // Replace placeholder unsubscribe link in HTML\n  let finalHtml = newsletterData.htmlContent;\n  \n  // Replace href=\"#\" with actual unsubscribe URL for the Unsubscribe link\n  finalHtml = finalHtml.replace(\n    /href=\"#\"([^>]*>Unsubscribe)/gi,\n    `href=\"${unsubscribeUrl}\"$1`\n  );\n  \n  // Also replace any {{unsubscribe_url}} placeholders\n  finalHtml = finalHtml.replace(/\\{\\{unsubscribe_url\\}\\}/g, unsubscribeUrl);\n  \n  // Replace {{name}} placeholder with actual subscriber name\n  finalHtml = finalHtml.replace(/\\{\\{name\\}\\}/g, subscriber.name);\n  \n  return {\n    json: {\n      to: subscriber.email,\n      name: subscriber.name,\n      subject: newsletterData.subject,\n      htmlContent: finalHtml,\n      unsubscribeUrl: unsubscribeUrl\n    }\n  };\n});\n\n// Return all email items\nreturn emailData;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        -96
+      ],
+      "id": "a7c5f0e8-9be2-4c0c-afff-f59fc2f1dee7",
+      "name": "Prepare Email with Unsubscribe"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the parsed AI response\nconst summary = $input.first().json;\nconst newsletterData = $('Generate HTML Newsletter').first().json;\n\n// Get twitter highlights\nlet twitterHighlights = summary.twitterHighlights || [];\nif (twitterHighlights.length === 0) {\n  try {\n    const mergeData = $('Merge & Extract').first().json;\n    if (mergeData && mergeData.tweets && mergeData.tweets.length > 0) {\n      twitterHighlights = mergeData.tweets.slice(0, 3).map(tweet => ({\n        text: tweet.text || '',\n        author: tweet.author || tweet.authorName || 'Twitter User',\n        likes: tweet.likes || tweet.likeCount || 0\n      }));\n    }\n  } catch (e) {\n    // Continue without tweets\n  }\n}\n\nconst categoryIcons = {\n  'launch': '🚀', 'price': '💰', 'ev': '⚡', 'electric': '⚡', 'sales': '📊',\n  'review': '⭐', 'spy': '🔍', 'facelift': '✨', 'update': '🔄', 'test': '🧪',\n  'suv': '🚙', 'sedan': '🚗', 'hatchback': '🚘', 'safety': '🛡️', 'feature': '🎯',\n  'compare': '⚖️', 'deal': '🏷️', 'offer': '🎁', 'record': '🏆', 'export': '🌍', 'production': '🏭'\n};\n\nfunction getIconForText(text) {\n  const lowerText = (text || '').toLowerCase();\n  for (const [keyword, icon] of Object.entries(categoryIcons)) {\n    if (lowerText.includes(keyword)) return icon;\n  }\n  return '📌';\n}\n\nfunction extractText(item) {\n  if (typeof item === 'string') return item;\n  if (typeof item === 'object' && item !== null) {\n    return item.text || item.title || item.content || item.description || item.headline || item.insight || '';\n  }\n  return String(item || '');\n}\n\nfunction extractUrl(item) {\n  if (typeof item === 'object' && item !== null) {\n    return item.url || item.link || item.href || '';\n  }\n  return '';\n}\n\n// Escape special characters for Slack markdown\nfunction escapeSlackText(text) {\n  if (!text) return '';\n  return text\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;');\n}\n\nconst today = new Date();\nconst dateStr = today.toLocaleDateString('en-IN', { \n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' \n});\n\n// Build Slack blocks\nconst blocks = [\n  // Header\n  {\n    \"type\": \"header\",\n    \"text\": {\n      \"type\": \"plain_text\",\n      \"text\": `🚗 ${summary.newsletterTitle || 'Auto India Daily'}`,\n      \"emoji\": true\n    }\n  },\n  {\n    \"type\": \"context\",\n    \"elements\": [\n      {\n        \"type\": \"mrkdwn\",\n        \"text\": `📅 ${dateStr} • Your Daily Dose of Car News`\n      }\n    ]\n  },\n  {\n    \"type\": \"divider\"\n  }\n];\n\n// Top Headlines Section\nif (summary.topHeadlines && summary.topHeadlines.length > 0) {\n  blocks.push({\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*🔥 TOP HEADLINES*\"\n    }\n  });\n\n  summary.topHeadlines.slice(0, 5).forEach((item, idx) => {\n    const icon = getIconForText(item.title);\n    const articleUrl = item.url || item.link || '';\n    const imageUrl = item.imageUrl;\n    \n    // Add image if available (first item only for visual impact)\n    if (idx === 0 && imageUrl && imageUrl.startsWith('http')) {\n      blocks.push({\n        \"type\": \"image\",\n        \"image_url\": imageUrl,\n        \"alt_text\": item.title\n      });\n    }\n    \n    // Truncate summary if too long (Slack has 3000 char limit per text block)\n    let summaryText = item.summary || '';\n    if (summaryText.length > 200) {\n      summaryText = summaryText.substring(0, 197) + '...';\n    }\n    \n    blocks.push({\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": `${idx === 0 ? '⭐ ' : ''}*${icon} ${item.title}*${summaryText ? `\\n${summaryText}` : ''}${articleUrl ? `\\n<${articleUrl}|Read More →>` : ''}`\n      }\n    });\n    \n    blocks.push({\n      \"type\": \"context\",\n      \"elements\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": `📰 ${item.source || 'Auto News'}`\n        }\n      ]\n    });\n    \n    if (idx < summary.topHeadlines.length - 1) {\n      blocks.push({\"type\": \"divider\"});\n    }\n  });\n  \n  blocks.push({\"type\": \"divider\"});\n}\n\n// Market Buzz Section\nif (summary.marketBuzz && summary.marketBuzz.length > 0) {\n  blocks.push({\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*📈 MARKET BUZZ*\"\n    }\n  });\n\n  summary.marketBuzz.forEach((item, idx) => {\n    const text = extractText(item);\n    const icon = getIconForText(text);\n    const url = extractUrl(item);\n    \n    // Truncate if too long\n    let displayText = text;\n    if (displayText.length > 300) {\n      displayText = displayText.substring(0, 297) + '...';\n    }\n    \n    blocks.push({\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": `${icon} ${displayText}${url ? `\\n<${url}|Learn More →>` : ''}`\n      }\n    });\n  });\n  \n  blocks.push({\"type\": \"divider\"});\n}\n\n// Quick Bites Section\nif (summary.quickBites && summary.quickBites.length > 0) {\n  blocks.push({\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*⚡ QUICK BITES*\"\n    }\n  });\n\n  const quickBitesText = summary.quickBites.slice(0, 8).map((item, idx) => {\n    const text = extractText(item);\n    const icon = getIconForText(text);\n    const url = extractUrl(item);\n    \n    // Truncate individual items\n    let displayText = text;\n    if (displayText.length > 150) {\n      displayText = displayText.substring(0, 147) + '...';\n    }\n    \n    return url ? `${icon} <${url}|${displayText}>` : `${icon} ${displayText}`;\n  }).join('\\n');\n\n  // Split into multiple blocks if too long\n  if (quickBitesText.length > 2800) {\n    const lines = quickBitesText.split('\\n');\n    let currentBlock = '';\n    \n    lines.forEach(line => {\n      if ((currentBlock + line).length > 2800) {\n        blocks.push({\n          \"type\": \"section\",\n          \"text\": {\n            \"type\": \"mrkdwn\",\n            \"text\": currentBlock\n          }\n        });\n        currentBlock = line + '\\n';\n      } else {\n        currentBlock += line + '\\n';\n      }\n    });\n    \n    if (currentBlock.trim()) {\n      blocks.push({\n        \"type\": \"section\",\n        \"text\": {\n          \"type\": \"mrkdwn\",\n          \"text\": currentBlock.trim()\n        }\n      });\n    }\n  } else {\n    blocks.push({\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": quickBitesText\n      }\n    });\n  }\n  \n  blocks.push({\"type\": \"divider\"});\n}\n\n// Twitter Highlights Section\nif (twitterHighlights && twitterHighlights.length > 0) {\n  blocks.push({\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*🐦 TWITTER BUZZ*\"\n    }\n  });\n\n  twitterHighlights.slice(0, 3).forEach((tweet, idx) => {\n    const text = typeof tweet === 'string' ? tweet : (tweet.text || '');\n    const author = tweet.author || tweet.authorName || 'Twitter User';\n    const likes = tweet.likes || tweet.likeCount || 0;\n    \n    // Truncate tweet if too long\n    let tweetText = text;\n    if (tweetText.length > 250) {\n      tweetText = tweetText.substring(0, 247) + '...';\n    }\n    \n    blocks.push({\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": `💬 _\"${tweetText}\"_`\n      }\n    });\n    \n    blocks.push({\n      \"type\": \"context\",\n      \"elements\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": `@${author} • ❤️ ${likes} likes`\n        }\n      ]\n    });\n  });\n  \n  blocks.push({\"type\": \"divider\"});\n}\n\n// Get subscriber count safely\nlet subscriberCount = 0;\ntry {\n  subscriberCount = $('Fetch Active Subscribers').all().length;\n} catch (e) {\n  // If node doesn't exist, skip\n}\n\n// Footer\nblocks.push({\n  \"type\": \"context\",\n  \"elements\": [\n    {\n      \"type\": \"mrkdwn\",\n      \"text\": `✅ Newsletter sent${subscriberCount > 0 ? ` to ${subscriberCount} subscribers` : ''} | Powered by AI • ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`\n    }\n  ]\n});\n\n// Return blocks as JSON string for Slack compatibility\nreturn [{\n  json: {\n    blocks: blocks, // Changed from 'content' to 'blocks', and removed JSON.stringify\n    text: `🚗 ${summary.newsletterTitle || 'Auto India Daily'} - ${dateStr}`\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        384
+      ],
+      "id": "ff837da7-53df-4001-ad31-48dc117ae59f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "=Cron Expression: 0 8 * * *\nTimezone: Asia/Kolkata"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -688,
+        240
+      ],
+      "id": "407df18a-3899-44c9-a9fb-b8d7d12e77e1",
+      "name": "Schedule Trigger1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Fetch Twitter/X Posts": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Fetch CarWale RSS": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fetch CarDekho RSS": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Summarize News": {
+      "main": [
+        [
+          {
+            "node": "Format AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Newsletter": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Newsletter Sent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Email with Unsubscribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Update Subscriber Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Merge & Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge & Extract": {
+      "main": [
+        [
+          {
+            "node": "AI Summarize News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI Response": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google_news search": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Prepare Email with Unsubscribe": {
+      "main": [
+        [
+          {
+            "node": "Send via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Google_news search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Twitter/X Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch CarWale RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch CarDekho RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6e5d21a8-e2f6-4564-8bda-9dab1c5d4865",
+  "meta": {
+    "instanceId": "b08e7d97ba362d65ba2ffa0048a0fc099897a02de485ed3accce7843908addd1"
+  },
+  "id": "qN2PCqy4AFbdp1L0",
+  "tags": []
+}
