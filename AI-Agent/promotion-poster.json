@@ -1,0 +1,296 @@
+{
+  "name": "promotion-poster",
+  "nodes": [
+    {
+      "parameters": {
+        "trigger": [
+          "message"
+        ],
+        "channelId": {
+          "__rl": true,
+          "value": "C0A2FE6HYAD",
+          "mode": "list",
+          "cachedResultName": "support-aws"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "55ac27a6-9867-4943-98f0-1104dd0caa5e",
+      "name": "Slack Trigger",
+      "webhookId": "858c5b60-b8ee-4100-a9d5-37df7624a23d",
+      "credentials": {
+        "slackApi": {
+          "id": "U70I9FiWPBTe1fA4",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b0f3523c-d80e-4ecc-905c-add8d9099d5b",
+              "name": "message_text",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        0
+      ],
+      "id": "95494716-600b-4214-8d15-54b28b04f230",
+      "name": "Extract the message"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Convert this marketing request into a clean poster prompt\n{{ $json.message_text }}"
+            },
+            {
+              "role": "system",
+              "content": "  You are an AI creative director. Rewrite the user message into a clean, professional image-generation prompt for a marketing poster."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "1b9bcbde-b011-4ec3-97a4-49a924dbbb7d",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "INR05gSoJclzMe74",
+          "name": "n8n-demo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-goog-api-key",
+              "value": "AIzaSyCbghNr2StBWVZdzwiWAzv98SQMms1a8_8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": {{ JSON.stringify($json.output[0].content[0].text) }}\n        }\n      ]\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1184,
+        0
+      ],
+      "id": "7c09e310-e7ea-461b-8914-b4a7c704c258",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "candidates[0].content.parts[1].inlineData.data",
+        "binaryPropertyName": "=",
+        "options": {
+          "mimeType": "image/png"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1392,
+        0
+      ],
+      "id": "c8516177-7de3-45bd-a601-f8a485477145",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "binaryPropertyName": "=",
+        "options": {
+          "channelId": "={{ $('Slack Trigger').item.json.channel }}"
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1600,
+        0
+      ],
+      "id": "bf563259-eecc-4a2c-ad30-ffa5ea8a96d1",
+      "name": "Upload a file",
+      "webhookId": "bec9a962-8905-4161-aa45-8c09c86a1ff4",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "neX68C3V4wnAsdQF",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6d7fb3bb-ed5a-43e9-af5d-a1cc875bab89",
+              "leftValue": "={{ $json.message_text.toLowerCase() }}",
+              "rightValue": "poster",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "f30aa383-c5f8-4ce7-ab18-552a24dd6c67",
+              "leftValue": "={{ $json.message_text.toLowerCase() }}\n",
+              "rightValue": "design",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "83d6cfcb-f3b4-4fc4-a9e7-dd4762caadc4",
+              "leftValue": "={{ $json.message_text.toLowerCase() }}\n",
+              "rightValue": "create",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "8dd5cba7-e258-4e5f-a480-4ead74f57d92",
+      "name": "If loop to avoid recursive image generation"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Slack Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract the message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract the message": {
+      "main": [
+        [
+          {
+            "node": "If loop to avoid recursive image generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Upload a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If loop to avoid recursive image generation": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6e17a073-2752-484c-8203-1f3ed19e3aa6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b08e7d97ba362d65ba2ffa0048a0fc099897a02de485ed3accce7843908addd1"
+  },
+  "id": "PFGLGdJNKqESSGjS",
+  "tags": []
+}
